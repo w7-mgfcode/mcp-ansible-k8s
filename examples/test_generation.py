@@ -78,8 +78,7 @@ def main() -> None:
 
     # Test cases
     test_cases = [
-        "Deploy Redis with 1 replica and ClusterIP service",
-        "Deploy HA Nginx with 3 replicas and a LoadBalancer service on port 80",
+        "Deploy Lonhorn via helm with 2 replicas",
     ]
 
     for test_case in test_cases:
