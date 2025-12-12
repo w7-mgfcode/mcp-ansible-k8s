@@ -48,6 +48,44 @@ def test_generate_playbook_success() -> None:
         assert result.tokens_used == 500
 
 
+def test_generate_playbook_with_claude() -> None:
+    """Test playbook generation with Claude provider and API key wiring."""
+    with (
+        patch("src.engine.create_llm_engine") as mock_llm_factory,
+        patch("src.engine.PlaybookValidator") as mock_validator_class,
+        patch("src.engine.load_system_prompt") as mock_prompt,
+    ):
+        mock_prompt.return_value = "System prompt"
+
+        mock_engine = Mock()
+        mock_response = GenerationResponse(
+            content="---\nvalid playbook", model="claude-sonnet-4-5", usage_tokens=600
+        )
+        mock_engine.generate.return_value = mock_response
+        mock_llm_factory.return_value = mock_engine
+
+        mock_validator = Mock()
+        mock_validation = ValidationResult(
+            is_valid=True, lint_output="OK", syntax_check_output="OK", errors=[], warnings=[]
+        )
+        mock_validator.validate.return_value = mock_validation
+        mock_validator_class.return_value = mock_validator
+
+        result = generate_playbook(
+            description="Deploy Nginx", llm_provider="claude", api_key="claude_test_key"
+        )
+
+        assert result.success
+        assert "valid playbook" in result.playbook_yaml
+
+        # Verify Settings was configured for Claude (not Gemini)
+        call_args = mock_llm_factory.call_args
+        settings_arg = call_args[0][0]
+        assert settings_arg.llm_provider == "claude"
+        assert settings_arg.claude_api_key == "claude_test_key"
+        assert settings_arg.gemini_api_key is None
+
+
 def test_generate_playbook_retry_on_failure() -> None:
     """Test playbook generation retries on validation failure."""
     with (
@@ -83,6 +121,17 @@ def test_generate_playbook_retry_on_failure() -> None:
         assert result.success
         assert "valid" in result.playbook_yaml
         assert mock_engine.generate.call_count == 2
+
+        # Verify second retry includes validation error feedback
+        # The engine calls: llm_engine.generate(request) where request is GenerationRequest
+        second_call = mock_engine.generate.call_args_list[1]
+        # Extract the GenerationRequest argument
+        generation_request = second_call[0][0] if second_call[0] else second_call.kwargs.get("request")
+
+        # Verify the retry prompt includes validation error feedback
+        assert "Error 1" in generation_request.user_prompt
+        assert "Previous attempt had validation errors" in generation_request.user_prompt
+        assert "kubernetes.core.k8s" in generation_request.user_prompt  # Guidance text
 
 
 def test_generate_playbook_max_retries_exceeded() -> None:
