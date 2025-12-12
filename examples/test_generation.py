@@ -24,9 +24,9 @@ def test_playbook_generation(description: str) -> None:
     Args:
         description: Natural language description of deployment
     """
-    print(f"\n{'='*80}")
+    print(f"\n{'=' * 80}")
     print(f"Testing: {description}")
-    print(f"{'='*80}\n")
+    print(f"{'=' * 80}\n")
 
     # Initialize components
     settings = Settings()
