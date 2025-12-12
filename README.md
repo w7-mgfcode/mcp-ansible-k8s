@@ -5,8 +5,11 @@ An AI-powered Model Context Protocol (MCP) server that generates production-read
 ## Features
 
 - 🤖 **AI-Powered Generation**: Uses Google Gemini or Anthropic Claude to generate playbooks from natural language
+- 🌐 **Web Interface**: Full-featured Streamlit dashboard with visual editor and playbook library
 - 🔒 **Sandboxed Validation**: All generated playbooks are validated in isolated Docker containers
 - ✅ **Best Practices Enforcement**: Ensures FQCN usage, idempotency, and prevents kubectl commands
+- 💾 **Playbook Library**: Persistent storage and management of generated playbooks
+- 📦 **Export Bundles**: Download playbooks with AI-generated documentation
 - 🔄 **Smart Retry Logic**: Automatically retries generation with error feedback if validation fails
 - 🎯 **MCP Protocol**: Standard interface for AI assistants and tools
 
@@ -101,7 +104,27 @@ GEMINI_API_KEY=your_gemini_api_key_here
 ANTHROPIC_API_KEY=your_anthropic_api_key_here
 ```
 
-## Usage
+## Quick Start
+
+### Option 1: Web Interface (Recommended)
+
+Start the complete application with Docker Compose:
+
+```bash
+# Build and start all services
+docker-compose up --build
+
+# Access the web interface
+open http://localhost:8501
+```
+
+The web interface provides:
+- 🤖 **AI Generator Tab**: Generate playbooks from natural language prompts
+- ✏️ **Visual Editor Tab**: Edit YAML with syntax highlighting and live validation
+- 📚 **Playbook Library**: Save, load, and manage your playbooks
+- 📦 **Export**: Download playbooks with AI-generated README documentation
+
+### Option 2: MCP Server (For AI Agents)
 
 ### Running the MCP Server
 
@@ -241,6 +264,58 @@ The system prompt (`examples/prompts/ansible_k8s_expert.txt`) enforces:
 - ❌ No kubectl commands
 - ✅ Proper YAML formatting
 - ✅ Complete K8s resource definitions
+
+## Web Interface Details
+
+### Features
+
+**AI Generator Tab:**
+1. Enter natural language description (e.g., "Deploy Redis with 3 replicas")
+2. Select LLM provider (Gemini or Claude)
+3. Adjust temperature for creativity vs consistency
+4. Click "Generate" to create validated playbook
+5. Save to library or edit further
+
+**Visual Editor Tab:**
+1. Edit YAML with syntax highlighting (powered by Ace Editor)
+2. Upload existing playbooks for validation
+3. Click "Validate" for real-time lint + syntax checking
+4. Save to persistent library
+5. Download as ZIP bundle (includes AI-generated README)
+
+**Sidebar:**
+- 🔑 API key management (session-specific, not persisted)
+- 📚 Playbook library with timestamps
+- 📂 Load/delete saved playbooks
+
+### Docker Compose Services
+
+```yaml
+services:
+  web:       # Streamlit UI on port 8501
+  mcp:       # MCP server (stdio transport)
+  validator: # Ansible validation environment
+
+volumes:
+  playbook-data:  # Persistent playbook storage
+```
+
+### Persistent Storage
+
+Playbooks are saved to a Docker volume (`playbook-data`) which persists across container restarts:
+
+```bash
+# List saved playbooks
+docker exec mcp-ansible-web ls -la /app/data/playbooks
+
+# Backup playbook library
+docker run --rm -v mcp-ansible-k8s_playbook-data:/data -v $(pwd):/backup \
+  alpine tar czf /backup/playbooks-backup.tar.gz -C /data playbooks
+
+# Restore playbook library
+docker run --rm -v mcp-ansible-k8s_playbook-data:/data -v $(pwd):/backup \
+  alpine tar xzf /backup/playbooks-backup.tar.gz -C /data
+```
 
 ## Troubleshooting
 

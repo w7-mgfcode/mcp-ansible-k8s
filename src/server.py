@@ -3,21 +3,14 @@
 from mcp.server.fastmcp import FastMCP
 
 from src.config import Settings
-from src.llm_engine import GenerationRequest, create_llm_engine
-from src.prompts import load_system_prompt
-from src.validator import PlaybookValidator
+from src.engine import generate_playbook, validate_playbook_yaml
 
-# Initialize settings and components
+# Initialize settings
 settings = Settings()
 settings.validate_api_keys()
 
 # Create FastMCP server
 mcp = FastMCP(settings.mcp_server_name)
-
-# Initialize LLM engine and validator
-llm_engine = create_llm_engine(settings)
-validator = PlaybookValidator(timeout=settings.docker_validation_timeout)
-system_prompt = load_system_prompt()
 
 
 @mcp.tool()
@@ -36,48 +29,35 @@ def smart_generate_playbook(description: str) -> str:
     Returns:
         Validated YAML playbook content or error message if generation fails
     """
-    max_retries = 2
-    current_description = description
-
-    for attempt in range(max_retries):
-        # Generate playbook using LLM
-        request = GenerationRequest(
-            user_prompt=current_description,
-            system_prompt=system_prompt,
-            max_tokens=4096,
-            temperature=0.3,  # Lower temperature for more consistent code generation
-        )
-
-        response = llm_engine.generate(request)
-        playbook_yaml = response.content
-
-        # Validate generated playbook
-        validation = validator.validate(playbook_yaml)
-
-        if validation.is_valid:
-            # Success! Return validated playbook
-            return playbook_yaml
-
-        # Validation failed - prepare retry with error feedback
-        if attempt < max_retries - 1:
-            error_feedback = "\n".join(validation.errors)
-            current_description = (
-                f"{description}\n\n"
-                f"Previous attempt had validation errors:\n{error_feedback}\n\n"
-                f"Please fix these issues and ensure:\n"
-                f"- All modules use FQCN (kubernetes.core.k8s not k8s)\n"
-                f"- No kubectl commands are used\n"
-                f"- YAML syntax is correct\n"
-                f"- All required fields are present"
-            )
-
-    # All retries failed
-    final_errors = "\n".join(validation.errors)
-    return (
-        f"ERROR: Failed to generate valid playbook after {max_retries} attempts.\n\n"
-        f"Last validation errors:\n{final_errors}\n\n"
-        f"Please try rephrasing your request or providing more specific details."
+    # Get API key from settings
+    api_key = (
+        settings.gemini_api_key if settings.llm_provider == "gemini" else settings.claude_api_key
     )
+
+    if not api_key:
+        return f"ERROR: {settings.llm_provider.upper()}_API_KEY not set"
+
+    # Call engine
+    result = generate_playbook(
+        description=description,
+        llm_provider=settings.llm_provider,
+        api_key=api_key,
+        validation_timeout=settings.docker_validation_timeout,
+    )
+
+    if result.success:
+        return result.playbook_yaml
+    else:
+        error_details = (
+            "\n".join(result.validation_result.errors)
+            if result.validation_result
+            else "Unknown error"
+        )
+        return (
+            f"ERROR: {result.error_message}\n\n"
+            f"Last validation errors:\n{error_details}\n\n"
+            f"Please try rephrasing your request or providing more specific details."
+        )
 
 
 @mcp.tool()
@@ -94,7 +74,7 @@ def validate_playbook(yaml_content: str) -> str:
     Returns:
         Formatted validation results with pass/fail status and details
     """
-    validation = validator.validate(yaml_content)
+    validation = validate_playbook_yaml(yaml_content, settings.docker_validation_timeout)
 
     if validation.is_valid:
         result = "✓ Playbook is valid!\n\n"

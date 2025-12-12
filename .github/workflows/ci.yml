@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, DEV, debug ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main, develop, DEV ]
   workflow_dispatch:
 
 jobs:
@@ -70,7 +70,7 @@ jobs:
         fail_ci_if_error: false
 
   docker-build:
-    name: Build Docker Validator
+    name: Build Docker Images
     runs-on: ubuntu-latest
 
     steps:
@@ -88,3 +88,15 @@ jobs:
       run: |
         docker run --rm mcp-ansible-validator:latest ansible-lint --version
         docker run --rm mcp-ansible-validator:latest ansible-playbook --version
+
+    - name: Build web image
+      run: |
+        docker build -t mcp-ansible-web:latest -f docker/Dockerfile.web .
+
+    - name: Build MCP server image
+      run: |
+        docker build -t mcp-ansible-server:latest -f docker/Dockerfile.mcp .
+
+    - name: Test Docker Compose configuration
+      run: |
+        docker compose config

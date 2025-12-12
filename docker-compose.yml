@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  # Streamlit Web Application
+  web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.web
+    container_name: mcp-ansible-web
+    ports:
+      - "8501:8501"
+    volumes:
+      # Persistent playbook storage
+      - playbook-data:/app/data
+      # Mount source for development (optional - comment out for production)
+      - ./src:/app/src:ro
+      - ./examples:/app/examples:ro
+      # Docker socket for validator access
+      # ⚠️ SECURITY: This grants root-level Docker access to the web container.
+      # Only use in trusted environments. For production, consider:
+      # - Using a dedicated validator service with restricted permissions
+      # - Running validation via API instead of direct Docker socket access
+      # - Implementing proper access controls and audit logging
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      # LLM Configuration (can be overridden via UI)
+      - LLM_PROVIDER=${LLM_PROVIDER:-gemini}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      # Validation Configuration
+      - DOCKER_VALIDATION_TIMEOUT=${DOCKER_VALIDATION_TIMEOUT:-30}
+    networks:
+      - mcp-network
+    depends_on:
+      - validator
+    restart: unless-stopped
+
+  # MCP Server (stdio-based)
+  mcp:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.mcp
+    container_name: mcp-ansible-server
+    volumes:
+      # Shared playbook storage
+      - playbook-data:/app/data
+      # Docker socket for validator access
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - LLM_PROVIDER=${LLM_PROVIDER:-gemini}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - DOCKER_VALIDATION_TIMEOUT=${DOCKER_VALIDATION_TIMEOUT:-30}
+    networks:
+      - mcp-network
+    depends_on:
+      - validator
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+
+  # Ansible Validator (pre-built image)
+  validator:
+    image: mcp-ansible-validator:latest
+    container_name: ansible-validator
+    command: /bin/sh -c "while true; do sleep 3600; done"
+    networks:
+      - mcp-network
+
+# Named volume for persistent playbook storage
+volumes:
+  playbook-data:
+    driver: local
+
+# Network for inter-service communication
+networks:
+  mcp-network:
+    driver: bridge

@@ -65,9 +65,7 @@ def test_validate_invalid_syntax(
     True,  # Skip by default as it requires Docker
     reason="Requires Docker validator image to be built",
 )
-def test_validate_missing_fqcn(
-    validator: PlaybookValidator, missing_fqcn_playbook: str
-) -> None:
+def test_validate_missing_fqcn(validator: PlaybookValidator, missing_fqcn_playbook: str) -> None:
     """Test validation fails when FQCN is missing."""
     result = validator.validate(missing_fqcn_playbook)
 
