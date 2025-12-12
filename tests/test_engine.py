@@ -126,7 +126,9 @@ def test_generate_playbook_retry_on_failure() -> None:
         # The engine calls: llm_engine.generate(request) where request is GenerationRequest
         second_call = mock_engine.generate.call_args_list[1]
         # Extract the GenerationRequest argument
-        generation_request = second_call[0][0] if second_call[0] else second_call.kwargs.get("request")
+        generation_request = (
+            second_call[0][0] if second_call[0] else second_call.kwargs.get("request")
+        )
 
         # Verify the retry prompt includes validation error feedback
         assert "Error 1" in generation_request.user_prompt
