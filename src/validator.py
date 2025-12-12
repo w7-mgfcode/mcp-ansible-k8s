@@ -57,50 +57,43 @@ class PlaybookValidator:
             subprocess.TimeoutExpired: If validation exceeds timeout
             FileNotFoundError: If Docker is not available
         """
-        # Write YAML to temp file in shared volume (not /tmp)
-        # When running docker-out-of-docker, volume mounts are interpreted as HOST paths
-        # So we must use a directory that's shared between containers
-        temp_dir = Path("/app/data/temp")
-        temp_dir.mkdir(parents=True, exist_ok=True)
-
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yml", delete=False, encoding="utf-8", dir=str(temp_dir)
-        ) as f:
-            f.write(playbook_yaml)
-            temp_path = Path(f.name)
-
+        # Run validation via stdin instead of file mount
+        # This avoids Docker-out-of-Docker volume mounting issues where
+        # the validator container can't access temp files from the web container
         try:
-            # Run ansible-lint in Docker
+            # Run ansible-lint with stdin
+            # Note: ansible-lint expects a file, so we use /dev/stdin
             lint_result = subprocess.run(
                 [
                     "docker",
                     "run",
                     "--rm",
-                    "-v",
-                    f"{temp_path.absolute()}:/workspace/playbook.yml:ro",
+                    "-i",  # Interactive mode for stdin
                     self.docker_image,
-                    "ansible-lint",
-                    "/workspace/playbook.yml",
+                    "sh",
+                    "-c",
+                    "cat > /tmp/playbook.yml && ansible-lint /tmp/playbook.yml",
                 ],
+                input=playbook_yaml,
                 capture_output=True,
                 text=True,
                 timeout=self.timeout,
-                check=False,  # Don't raise on non-zero exit
+                check=False,
             )
 
-            # Run ansible-playbook --syntax-check in Docker
+            # Run ansible-playbook --syntax-check with stdin
             syntax_result = subprocess.run(
                 [
                     "docker",
                     "run",
                     "--rm",
-                    "-v",
-                    f"{temp_path.absolute()}:/workspace/playbook.yml:ro",
+                    "-i",
                     self.docker_image,
-                    "ansible-playbook",
-                    "--syntax-check",
-                    "/workspace/playbook.yml",
+                    "sh",
+                    "-c",
+                    "cat > /tmp/playbook.yml && ansible-playbook --syntax-check /tmp/playbook.yml",
                 ],
+                input=playbook_yaml,
                 capture_output=True,
                 text=True,
                 timeout=self.timeout,
@@ -137,6 +130,19 @@ class PlaybookValidator:
                 warnings=warnings,
             )
 
-        finally:
-            # Cleanup temp file
-            temp_path.unlink(missing_ok=True)
+        except subprocess.TimeoutExpired:
+            return ValidationResult(
+                is_valid=False,
+                lint_output="",
+                syntax_check_output="",
+                errors=[f"Validation timeout after {self.timeout} seconds"],
+                warnings=[],
+            )
+        except Exception as e:
+            return ValidationResult(
+                is_valid=False,
+                lint_output="",
+                syntax_check_output="",
+                errors=[f"Validation error: {type(e).__name__}: {str(e)}"],
+                warnings=[],
+            )
