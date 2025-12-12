@@ -118,11 +118,22 @@ def load_playbook(filename: str, data_dir: Path) -> str:
 
     Raises:
         FileNotFoundError: If playbook doesn't exist
+        ValueError: If filename contains path traversal attempts
     """
+    # Validate filename to prevent directory traversal
+    if ".." in filename or "/" in filename or "\\" in filename:
+        raise ValueError(f"Invalid filename (contains path separators): {filename}")
+
     filepath = data_dir / "playbooks" / filename
 
     if not filepath.exists():
         raise FileNotFoundError(f"Playbook not found: {filename}")
+
+    # Verify resolved path is still within playbooks directory (defense in depth)
+    try:
+        filepath.resolve().relative_to((data_dir / "playbooks").resolve())
+    except ValueError:
+        raise ValueError(f"Path traversal detected: {filename}")
 
     return filepath.read_text(encoding="utf-8")
 
@@ -137,8 +148,21 @@ def delete_playbook(filename: str, data_dir: Path) -> bool:
 
     Returns:
         True if deleted successfully, False if file didn't exist
+
+    Raises:
+        ValueError: If filename contains path traversal attempts
     """
+    # Validate filename to prevent directory traversal
+    if ".." in filename or "/" in filename or "\\" in filename:
+        raise ValueError(f"Invalid filename (contains path separators): {filename}")
+
     filepath = data_dir / "playbooks" / filename
+
+    # Verify resolved path is still within playbooks directory
+    try:
+        filepath.resolve().relative_to((data_dir / "playbooks").resolve())
+    except ValueError:
+        raise ValueError(f"Path traversal detected: {filename}")
 
     if filepath.exists():
         filepath.unlink()

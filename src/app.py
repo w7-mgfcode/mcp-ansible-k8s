@@ -93,6 +93,7 @@ def create_sidebar() -> None:
                     try:
                         content = load_playbook(selected_filename, DATA_DIR)
                         st.session_state.current_playbook = content
+                        st.session_state.validation_result = None  # Clear stale validation
                         st.success("Loaded successfully!")
                         st.rerun()
                     except Exception as e:
@@ -100,11 +101,15 @@ def create_sidebar() -> None:
 
             with col2:
                 if st.button("🗑️ Delete", use_container_width=True):
-                    if delete_playbook(selected_filename, DATA_DIR):
-                        st.success("Deleted successfully!")
-                        st.rerun()
-                    else:
-                        st.error("Delete failed")
+                    try:
+                        if delete_playbook(selected_filename, DATA_DIR):
+                            st.session_state.validation_result = None  # Clear stale validation
+                            st.success("Deleted successfully!")
+                            st.rerun()
+                        else:
+                            st.error("Delete failed")
+                    except ValueError as e:
+                        st.error(f"Security error: {e}")
     else:
         st.sidebar.info("No saved playbooks yet. Generate one in the AI tab!")
 
@@ -241,8 +246,8 @@ def create_editor_tab() -> None:
         wrap=True,
     )
 
-    # Update session state if editor changed
-    if edited_content != st.session_state.current_playbook:
+    # Update session state if editor changed (guard against None)
+    if edited_content is not None and edited_content != st.session_state.current_playbook:
         st.session_state.current_playbook = edited_content
 
     # File upload

@@ -171,7 +171,7 @@ If you discover a security vulnerability, please **DO NOT** open a public issue.
 
 Instead, please report it privately:
 
-**Email:** [security@yourdomain.com]
+**Email:** gabor@w7-7.net
 **GitHub Security Advisory:** https://github.com/w7-mgfcode/mcp-ansible-k8s/security/advisories/new
 
 **Response Time:**

@@ -126,6 +126,19 @@ def test_load_playbook_not_found(tmp_path: Path) -> None:
         load_playbook("nonexistent.yml", tmp_path)
 
 
+def test_load_playbook_path_traversal(tmp_path: Path) -> None:
+    """Test loading playbook prevents directory traversal."""
+    # Test various path traversal attempts
+    with pytest.raises(ValueError, match="path separators"):
+        load_playbook("../../../etc/passwd", tmp_path)
+
+    with pytest.raises(ValueError, match="path separators"):
+        load_playbook("subdir/file.yml", tmp_path)
+
+    with pytest.raises(ValueError, match="path separators"):
+        load_playbook("..\\..\\windows\\system32", tmp_path)
+
+
 def test_delete_playbook(tmp_path: Path) -> None:
     """Test deleting playbook removes file."""
     filepath = save_playbook("---\ntest", "Test", tmp_path)
@@ -144,6 +157,16 @@ def test_delete_playbook_not_found(tmp_path: Path) -> None:
     """Test deleting non-existent playbook returns False."""
     result = delete_playbook("nonexistent.yml", tmp_path)
     assert result is False
+
+
+def test_delete_playbook_path_traversal(tmp_path: Path) -> None:
+    """Test deleting playbook prevents directory traversal."""
+    # Test various path traversal attempts
+    with pytest.raises(ValueError, match="path separators"):
+        delete_playbook("../../../etc/passwd", tmp_path)
+
+    with pytest.raises(ValueError, match="path separators"):
+        delete_playbook("subdir/file.yml", tmp_path)
 
 
 def test_create_zip_bundle() -> None:
