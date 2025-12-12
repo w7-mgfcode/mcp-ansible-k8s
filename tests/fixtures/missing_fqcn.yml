@@ -1,0 +1,15 @@
+---
+- name: Deploy without FQCN
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+    - name: Create namespace without FQCN
+      k8s:  # Missing FQCN - should be kubernetes.core.k8s
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: test

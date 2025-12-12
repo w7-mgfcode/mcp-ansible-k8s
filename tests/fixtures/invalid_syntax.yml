@@ -1,0 +1,15 @@
+---
+- name: Deploy with Syntax Error
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+    - name: Bad indentation
+     kubernetes.core.k8s:  # Wrong indentation level
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: test

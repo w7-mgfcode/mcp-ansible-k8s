@@ -1,0 +1,77 @@
+# Python Virtual Environments
+venv/
+venv_windows/
+venv_linux/
+env/
+ENV/
+.venv/
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+
+# Type Checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Linting
+.ruff_cache/
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+
+# IDE & Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Claude Code Configuration
+.claude/
+
+# Project Documentation (local only)
+INITIAL.md
+CLAUDE.md
+
+# Logs
+logs/
+*.log
+
+# Distribution / Packaging
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Jupyter Notebooks (if added later)
+.ipynb_checkpoints/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Docker volumes (if any)
+docker-compose.override.yml
