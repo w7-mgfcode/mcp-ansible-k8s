@@ -1,6 +1,6 @@
 """Core playbook generation engine - shared between MCP server and web app."""
 
-from typing import Literal, cast
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -33,7 +33,7 @@ class PlaybookGenerationResult(BaseModel):
 
 def generate_playbook(
     description: str,
-    llm_provider: str,
+    llm_provider: Literal["gemini", "claude"],
     api_key: str,
     max_retries: int = 2,
     temperature: float = 0.3,
@@ -55,11 +55,22 @@ def generate_playbook(
     Returns:
         PlaybookGenerationResult with playbook or error details
     """
+    # Validate provider early
+    if llm_provider not in ("gemini", "claude"):
+        return PlaybookGenerationResult(
+            success=False,
+            playbook_yaml="",
+            error_message=f"Unsupported llm_provider: {llm_provider}. Must be 'gemini' or 'claude'",
+        )
+
+    # Initialize variables before loop to avoid undefined references
+    playbook_yaml = ""
+    validation: ValidationResult | None = None
+
     try:
         # Create settings with provided credentials
-        provider = cast(Literal["gemini", "claude"], llm_provider)
         settings = Settings(
-            llm_provider=provider,
+            llm_provider=llm_provider,
             gemini_api_key=api_key if llm_provider == "gemini" else None,
             claude_api_key=api_key if llm_provider == "claude" else None,
             docker_validation_timeout=validation_timeout,
@@ -140,7 +151,9 @@ def validate_playbook_yaml(yaml_content: str, validation_timeout: int = 30) -> V
     return validator.validate(yaml_content)
 
 
-def generate_readme(playbook_yaml: str, llm_provider: str, api_key: str) -> str:
+def generate_readme(
+    playbook_yaml: str, llm_provider: Literal["gemini", "claude"], api_key: str
+) -> str:
     """
     Generate README.md documentation for a playbook using LLM.
 
@@ -153,9 +166,8 @@ def generate_readme(playbook_yaml: str, llm_provider: str, api_key: str) -> str:
         Generated README markdown content
     """
     try:
-        provider = cast(Literal["gemini", "claude"], llm_provider)
         settings = Settings(
-            llm_provider=provider,
+            llm_provider=llm_provider,
             gemini_api_key=api_key if llm_provider == "gemini" else None,
             claude_api_key=api_key if llm_provider == "claude" else None,
         )

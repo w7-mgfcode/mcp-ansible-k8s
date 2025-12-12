@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+from typing import Literal, cast
 
 import streamlit as st
 from streamlit_ace import st_ace  # type: ignore[import-untyped]
@@ -126,9 +127,11 @@ def create_generator_tab() -> None:
         )
 
     with col2:
-        llm_provider = st.radio(
+        llm_provider_choice = st.radio(
             "LLM Provider", options=["gemini", "claude"], index=0, help="Choose your AI provider"
         )
+        # Cast to Literal for type safety
+        llm_provider = cast(Literal["gemini", "claude"], llm_provider_choice)
 
         temperature = st.slider(
             "Temperature",
@@ -210,14 +213,21 @@ def create_generator_tab() -> None:
 
         with col2:
             if st.button("✏️ Edit in Visual Editor", use_container_width=True):
-                st.session_state.editor_tab_switch = True
-                st.rerun()
+                st.info("Switch to the 'Visual Editor' tab to edit this playbook")
+                # Note: Streamlit doesn't support programmatic tab switching yet
 
 
 def create_editor_tab() -> None:
     """Create the Visual Editor tab."""
     st.header("✏️ Visual Playbook Editor")
     st.caption("Edit and validate Ansible playbooks with syntax highlighting")
+
+    # Description input for saving (outside button to be editable)
+    save_description = st.text_input(
+        "Playbook Description (for saving):",
+        value="My Playbook",
+        help="This will be used when saving to the library",
+    )
 
     # Editor
     edited_content = st_ace(
@@ -270,9 +280,10 @@ def create_editor_tab() -> None:
     with col2:
         if st.button("💾 Save", use_container_width=True):
             if st.session_state.current_playbook:
-                desc = st.text_input("Description:", value="My Playbook", key="save_desc")
                 try:
-                    filepath = save_playbook(st.session_state.current_playbook, desc, DATA_DIR)
+                    filepath = save_playbook(
+                        st.session_state.current_playbook, save_description, DATA_DIR
+                    )
                     st.success(f"Saved as {filepath.name}")
                 except Exception as e:
                     st.error(f"Error: {e}")
@@ -284,13 +295,14 @@ def create_editor_tab() -> None:
         if st.button("📦 Download Bundle", use_container_width=True):
             if st.session_state.current_playbook:
                 # Get API key for README generation
-                llm_provider = "gemini" if st.session_state.gemini_api_key else "claude"
+                llm_provider_str = "gemini" if st.session_state.gemini_api_key else "claude"
+                llm_provider_typed = cast(Literal["gemini", "claude"], llm_provider_str)
                 api_key = st.session_state.gemini_api_key or st.session_state.claude_api_key
 
                 if api_key:
                     with st.spinner("Generating README..."):
                         readme = generate_readme(
-                            st.session_state.current_playbook, llm_provider, api_key
+                            st.session_state.current_playbook, llm_provider_typed, api_key
                         )
                         zip_bytes = create_zip_bundle(
                             st.session_state.current_playbook,

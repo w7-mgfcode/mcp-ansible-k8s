@@ -16,6 +16,11 @@ services:
       - ./src:/app/src:ro
       - ./examples:/app/examples:ro
       # Docker socket for validator access
+      # ⚠️ SECURITY: This grants root-level Docker access to the web container.
+      # Only use in trusted environments. For production, consider:
+      # - Using a dedicated validator service with restricted permissions
+      # - Running validation via API instead of direct Docker socket access
+      # - Implementing proper access controls and audit logging
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       # LLM Configuration (can be overridden via UI)

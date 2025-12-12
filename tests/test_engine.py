@@ -131,7 +131,7 @@ def test_generate_playbook_exception_handling() -> None:
 
 
 def test_validate_playbook_yaml() -> None:
-    """Test YAML validation function."""
+    """Test YAML validation function with timeout propagation."""
     with patch("src.engine.PlaybookValidator") as mock_validator_class:
         mock_validator = Mock()
         mock_result = ValidationResult(
@@ -140,10 +140,12 @@ def test_validate_playbook_yaml() -> None:
         mock_validator.validate.return_value = mock_result
         mock_validator_class.return_value = mock_validator
 
-        result = validate_playbook_yaml("---\ntest: yaml")
+        result = validate_playbook_yaml("---\ntest: yaml", validation_timeout=45)
 
         assert result.is_valid
         mock_validator.validate.assert_called_once_with("---\ntest: yaml")
+        # Verify timeout is propagated to PlaybookValidator constructor
+        mock_validator_class.assert_called_once_with(timeout=45)
 
 
 def test_generate_readme() -> None:

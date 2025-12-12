@@ -26,6 +26,9 @@ def test_sanitize_filename() -> None:
     assert sanitize_filename("../../../etc/passwd") == "etcpasswd"
     assert sanitize_filename("file<>:|?*.yml") == "fileyml"
 
+    # Test Windows-style path traversal
+    assert sanitize_filename("..\\..\\windows\\system32") == "windowssystem32"
+
     # Test spaces converted to underscores
     assert sanitize_filename("my test file") == "my_test_file"
 
@@ -77,6 +80,34 @@ def test_list_saved_playbooks(tmp_path: Path) -> None:
 
     # Check they're sorted by creation time (newest first)
     assert playbooks[0].created_at >= playbooks[1].created_at
+
+
+def test_list_saved_playbooks_description_extraction(tmp_path: Path) -> None:
+    """Test description extraction from filenames with edge cases."""
+    # list_saved_playbooks expects files in {data_dir}/playbooks/
+    playbooks_dir = tmp_path / "playbooks"
+    playbooks_dir.mkdir(exist_ok=True)
+
+    # Case 1: Filename with only timestamp (no description)
+    (playbooks_dir / "20231201_120000.yml").write_text("---\ntest")
+
+    # Case 2: Description with multiple underscores
+    (playbooks_dir / "20231201_120100_my_complex_deployment_name.yml").write_text("---\ntest")
+
+    playbooks = list_saved_playbooks(tmp_path)
+
+    # Verify both files are listed
+    assert len(playbooks) == 2
+
+    # Find the files by searching descriptions
+    no_desc = next(p for p in playbooks if "20231201_120000" in p.filename)
+    multi_underscore = next(p for p in playbooks if "my_complex" in p.filename)
+
+    # Case 1: No description fallback (last part after splitting)
+    assert len(no_desc.description) > 0
+
+    # Case 2: Multiple underscores should be preserved in description
+    assert "my complex deployment name" in multi_underscore.description
 
 
 def test_load_playbook(tmp_path: Path) -> None:
