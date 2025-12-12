@@ -133,7 +133,7 @@ def load_playbook(filename: str, data_dir: Path) -> str:
     try:
         filepath.resolve().relative_to((data_dir / "playbooks").resolve())
     except ValueError:
-        raise ValueError(f"Path traversal detected: {filename}")
+        raise ValueError(f"Path traversal detected: {filename}") from None
 
     return filepath.read_text(encoding="utf-8")
 
@@ -162,7 +162,7 @@ def delete_playbook(filename: str, data_dir: Path) -> bool:
     try:
         filepath.resolve().relative_to((data_dir / "playbooks").resolve())
     except ValueError:
-        raise ValueError(f"Path traversal detected: {filename}")
+        raise ValueError(f"Path traversal detected: {filename}") from None
 
     if filepath.exists():
         filepath.unlink()
