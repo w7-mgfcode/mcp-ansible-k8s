@@ -40,6 +40,8 @@ def initialize_session_state() -> None:
         st.session_state.claude_api_key = os.getenv("ANTHROPIC_API_KEY", "")
     if "last_description" not in st.session_state:
         st.session_state.last_description = ""
+    if "load_success_message" not in st.session_state:
+        st.session_state.load_success_message = None
 
 
 def create_sidebar() -> None:
@@ -94,7 +96,12 @@ def create_sidebar() -> None:
                         content = load_playbook(selected_filename, DATA_DIR)
                         st.session_state.current_playbook = content
                         st.session_state.validation_result = None  # Clear stale validation
-                        st.success("Loaded successfully!")
+                        # Set persistent message to guide user
+                        playbook_name = selected_display.split(" - ")[-1]
+                        st.session_state.load_success_message = (
+                            f"✅ Playbook '{playbook_name}' loaded successfully! "
+                            "Switch to the **✏️ Visual Editor** tab to view and edit it."
+                        )
                         st.rerun()
                     except Exception as e:
                         st.error(f"Error loading: {e}")
@@ -401,6 +408,16 @@ def main() -> None:
 
     # Create sidebar
     create_sidebar()
+
+    # Show persistent load success message if present
+    if st.session_state.load_success_message:
+        col1, col2 = st.columns([4, 1])
+        with col1:
+            st.info(st.session_state.load_success_message)
+        with col2:
+            if st.button("✖ Dismiss"):
+                st.session_state.load_success_message = None
+                st.rerun()
 
     # Create tabs
     tab1, tab2 = st.tabs(["🤖 AI Generator", "✏️ Visual Editor"])
