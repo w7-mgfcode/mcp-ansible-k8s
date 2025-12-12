@@ -57,9 +57,14 @@ class PlaybookValidator:
             subprocess.TimeoutExpired: If validation exceeds timeout
             FileNotFoundError: If Docker is not available
         """
-        # Write YAML to temp file
+        # Write YAML to temp file in shared volume (not /tmp)
+        # When running docker-out-of-docker, volume mounts are interpreted as HOST paths
+        # So we must use a directory that's shared between containers
+        temp_dir = Path("/app/data/temp")
+        temp_dir.mkdir(parents=True, exist_ok=True)
+
         with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yml", delete=False, encoding="utf-8"
+            mode="w", suffix=".yml", delete=False, encoding="utf-8", dir=str(temp_dir)
         ) as f:
             f.write(playbook_yaml)
             temp_path = Path(f.name)
