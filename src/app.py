@@ -40,6 +40,8 @@ def initialize_session_state() -> None:
         st.session_state.claude_api_key = os.getenv("ANTHROPIC_API_KEY", "")
     if "last_description" not in st.session_state:
         st.session_state.last_description = ""
+    if "load_success_message" not in st.session_state:
+        st.session_state.load_success_message = None
 
 
 def create_sidebar() -> None:
@@ -94,7 +96,12 @@ def create_sidebar() -> None:
                         content = load_playbook(selected_filename, DATA_DIR)
                         st.session_state.current_playbook = content
                         st.session_state.validation_result = None  # Clear stale validation
-                        st.success("Loaded successfully!")
+                        # Set persistent message to guide user
+                        playbook_name = selected_display.split(" - ")[-1]
+                        st.session_state.load_success_message = (
+                            f"✅ Playbook '{playbook_name}' loaded successfully! "
+                            "Switch to the **✏️ Visual Editor** tab to view and edit it."
+                        )
                         st.rerun()
                     except Exception as e:
                         st.error(f"Error loading: {e}")
@@ -164,6 +171,16 @@ def create_generator_tab() -> None:
             st.warning("Please enter a description of what you want to deploy")
             return
 
+        # Verify API key before proceeding
+        if len(api_key) < 10:
+            st.error(f"⚠️ Invalid API key length: {len(api_key)} characters")
+            st.stop()
+
+        # Show which API is being used (for debugging)
+        st.info(
+            f"🔑 Using {llm_provider.upper()} API (key: {api_key[:4]}****{api_key[-4:]})"
+        )
+
         # Save description for next time
         st.session_state.last_description = description
 
@@ -173,6 +190,7 @@ def create_generator_tab() -> None:
                 llm_provider=llm_provider,
                 api_key=api_key,
                 temperature=temperature,
+                max_retries=1,  # Reduce to 1 to minimize API calls during debugging
             )
 
         if result.success:
@@ -183,6 +201,24 @@ def create_generator_tab() -> None:
             st.session_state.validation_result = result.validation_result
         else:
             st.error(f"✗ Generation failed: {result.error_message}")
+
+            # Debug information
+            with st.expander("🔍 Debug Information", expanded=True):
+                st.write(f"**Provider:** {llm_provider}")
+                st.write(f"**API Key (first 4):** {api_key[:4]}****")
+                st.write(f"**API Key (last 4):** ****{api_key[-4:]}")
+                st.write(f"**Key Length:** {len(api_key)} characters")
+                st.write(f"**Temperature:** {temperature}")
+                st.write(f"**Max Retries:** 1 (reduced for debugging)")
+
+                if "429" in str(result.error_message):
+                    st.warning(
+                        "**⚠️ 429 Rate Limit Error**\n\n"
+                        "Check Docker logs: `docker-compose logs web | grep -E 'ERROR|429'`\n\n"
+                        "Verify your Google Cloud project quotas at:\n"
+                        "https://console.cloud.google.com/apis/api/generativelanguage.googleapis.com/quotas"
+                    )
+
             if result.validation_result:
                 with st.expander("View validation errors"):
                     for error in result.validation_result.errors:
@@ -372,6 +408,16 @@ def main() -> None:
 
     # Create sidebar
     create_sidebar()
+
+    # Show persistent load success message if present
+    if st.session_state.load_success_message:
+        col1, col2 = st.columns([4, 1])
+        with col1:
+            st.info(st.session_state.load_success_message)
+        with col2:
+            if st.button("✖ Dismiss"):
+                st.session_state.load_success_message = None
+                st.rerun()
 
     # Create tabs
     tab1, tab2 = st.tabs(["🤖 AI Generator", "✏️ Visual Editor"])

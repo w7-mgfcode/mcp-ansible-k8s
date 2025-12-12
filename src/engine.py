@@ -1,5 +1,6 @@
 """Core playbook generation engine - shared between MCP server and web app."""
 
+import logging
 from typing import Literal
 
 from pydantic import BaseModel
@@ -8,6 +9,10 @@ from src.config import Settings
 from src.llm_engine import GenerationRequest, create_llm_engine
 from src.prompts import load_system_prompt
 from src.validator import PlaybookValidator, ValidationResult
+
+# Configure logging
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 
 class PlaybookGenerationResult(BaseModel):
@@ -55,6 +60,14 @@ def generate_playbook(
     Returns:
         PlaybookGenerationResult with playbook or error details
     """
+    # Debug logging
+    logger.info(
+        f"🔍 generate_playbook called: provider={llm_provider}, "
+        f"key_prefix={api_key[:4] if api_key else 'NONE'}****, "
+        f"key_length={len(api_key) if api_key else 0}, "
+        f"max_retries={max_retries}"
+    )
+
     # Validate provider early
     if llm_provider not in ("gemini", "claude"):
         return PlaybookGenerationResult(
@@ -75,15 +88,19 @@ def generate_playbook(
             claude_api_key=api_key if llm_provider == "claude" else None,
             docker_validation_timeout=validation_timeout,
         )
+        logger.info(f"✓ Settings created for {llm_provider}")
 
         # Initialize components
         llm_engine = create_llm_engine(settings)
         validator = PlaybookValidator(timeout=validation_timeout)
         system_prompt = load_system_prompt()
+        logger.info(f"✓ Components initialized")
 
         current_description = description
 
         for attempt in range(max_retries):
+            logger.info(f"📝 Attempt {attempt + 1}/{max_retries}: Generating playbook...")
+
             # Generate playbook
             request = GenerationRequest(
                 user_prompt=current_description,
@@ -92,10 +109,21 @@ def generate_playbook(
                 temperature=temperature,
             )
 
-            response = llm_engine.generate(request)
-            playbook_yaml = response.content
+            try:
+                response = llm_engine.generate(request)
+                playbook_yaml = response.content
+                logger.info(
+                    f"✅ Generation successful: model={response.model}, tokens={response.usage_tokens}"
+                )
+            except Exception as gen_error:
+                logger.error(
+                    f"❌ Generation failed on attempt {attempt + 1}: "
+                    f"{type(gen_error).__name__}: {str(gen_error)[:200]}"
+                )
+                raise  # Re-raise to be caught by outer try/except
 
             # Validate
+            logger.info(f"🔍 Validating generated playbook...")
             validation = validator.validate(playbook_yaml)
 
             if validation.is_valid:
