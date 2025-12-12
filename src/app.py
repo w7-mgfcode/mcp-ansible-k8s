@@ -164,6 +164,16 @@ def create_generator_tab() -> None:
             st.warning("Please enter a description of what you want to deploy")
             return
 
+        # Verify API key before proceeding
+        if len(api_key) < 10:
+            st.error(f"⚠️ Invalid API key length: {len(api_key)} characters")
+            st.stop()
+
+        # Show which API is being used (for debugging)
+        st.info(
+            f"🔑 Using {llm_provider.upper()} API (key: {api_key[:4]}****{api_key[-4:]})"
+        )
+
         # Save description for next time
         st.session_state.last_description = description
 
@@ -173,6 +183,7 @@ def create_generator_tab() -> None:
                 llm_provider=llm_provider,
                 api_key=api_key,
                 temperature=temperature,
+                max_retries=1,  # Reduce to 1 to minimize API calls during debugging
             )
 
         if result.success:
@@ -183,6 +194,24 @@ def create_generator_tab() -> None:
             st.session_state.validation_result = result.validation_result
         else:
             st.error(f"✗ Generation failed: {result.error_message}")
+
+            # Debug information
+            with st.expander("🔍 Debug Information", expanded=True):
+                st.write(f"**Provider:** {llm_provider}")
+                st.write(f"**API Key (first 4):** {api_key[:4]}****")
+                st.write(f"**API Key (last 4):** ****{api_key[-4:]}")
+                st.write(f"**Key Length:** {len(api_key)} characters")
+                st.write(f"**Temperature:** {temperature}")
+                st.write(f"**Max Retries:** 1 (reduced for debugging)")
+
+                if "429" in str(result.error_message):
+                    st.warning(
+                        "**⚠️ 429 Rate Limit Error**\n\n"
+                        "Check Docker logs: `docker-compose logs web | grep -E 'ERROR|429'`\n\n"
+                        "Verify your Google Cloud project quotas at:\n"
+                        "https://console.cloud.google.com/apis/api/generativelanguage.googleapis.com/quotas"
+                    )
+
             if result.validation_result:
                 with st.expander("View validation errors"):
                     for error in result.validation_result.errors:
