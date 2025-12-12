@@ -22,6 +22,9 @@ COPY examples/ ./examples/
 # Create data directory
 RUN mkdir -p /app/data/playbooks
 
+# Set PYTHONPATH for consistency (explicit configuration)
+ENV PYTHONPATH=/app
+
 # MCP server runs on stdio (no exposed ports)
 
 # Run MCP server
